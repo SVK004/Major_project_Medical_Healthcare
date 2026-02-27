@@ -1,0 +1,20 @@
+# Python bytecode (the __pycache__ folder in your pic)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment (the venv folder in your pic)
+venv/
+ENV/
+env/
+
+# Environment Variables (Crucial for MongoDB URIs/API Keys)
+.env
+
+# Editor specific files
+.vscode/
+.idea/
+
+# OS specific files
+.DS_Store
+Thumbs.db
