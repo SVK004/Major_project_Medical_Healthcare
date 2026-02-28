@@ -1,47 +1,19 @@
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from typing import List, Optional
-from Model.FDA_search import get_drugs
+# Ensure these imports exist and don't import 'app' back into themselves!
+from Model.FDA_search import get_drugs, fetch_from_fda 
 from Model.RAG_model import ai_diagnose
 
 app = FastAPI()
 
-# Mock RAG source (Replace with your load_rag_data() function)
-RAG_DATA_SOURCE = """
-Symptom: memory loss, confusion, disorientation. Disease: Alzheimer
-Symptom: high blood sugar, excessive thirst, frequent urination. Disease: Diabetes
-Symptom: wheezing, shortness of breath, chest tightness. Disease: Asthma
-"""
-knowledge_chunks = [line.strip() for line in RAG_DATA_SOURCE.splitlines() if line.strip()]
+# 1. Renamed to avoid shadowing inside the function
+DEFAULT_KNOWLEDGE_CHUNKS = [
+    "Symptom: memory loss, confusion, disorientation. Disease: Alzheimers",
+    "Symptom: high blood sugar, excessive thirst, frequent urination. Disease: Diabetes",
+    "Symptom: wheezing, shortness of breath, chest tightness. Disease: Asthma"
+]
 
-
-
-async def fetch_from_fda(disease: str, status: str):
-    # 1. Clean the disease name
-    clean_disease = disease.replace("'", "").strip()
-    
-    # 2. Switch to the LABEL endpoint for better matches
-    # This searches the 'indications_and_usage' section of the drug label
-    label_url = "https://api.fda.gov/drug/label.json"
-    
-    # 3. Construct a broader query
-    # We search for the disease in the indications and filter by product type
-    search_query = f'indications_and_usage:"{clean_disease}"'
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            label_url, 
-            params={"search": search_query, "limit": 10},
-            timeout=10.0
-        )
-        
-        # Log this to your terminal to see the actual FDA call!
-        print(f"DEBUG: FDA URL: {response.url}")
-        
-        if response.status_code != 200:
-            return None
-        
-        return response.json().get("results", [])
 @app.get("/search-drugs")
 async def search_drugs(
     disease: str, 
@@ -49,7 +21,17 @@ async def search_drugs(
 ):
     return await get_drugs(disease, status)
 
-
 @app.get("/ai-diagnose")
-async def ai_diagnose_endpoint(symptoms: str = Query(..., description="Describe your symptoms")):
-    return await ai_diagnose(symptoms, knowledge_chunks)
+async def ai_diagnose_endpoint(
+    symptoms: str = Query(..., description="Describe your symptoms"), 
+    knowledge_chunks: Optional[List[str]] = Query(None)
+):
+    # 2. Logic fix: If URL params are empty, use the DEFAULT list
+    chunks_to_use = knowledge_chunks if knowledge_chunks else DEFAULT_KNOWLEDGE_CHUNKS
+    
+    try:
+        return await ai_diagnose(symptoms, chunks_to_use)
+    except Exception as e:
+        # This will show you the ACTUAL error in your terminal
+        print(f"CRITICAL ERROR: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

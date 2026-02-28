@@ -3,11 +3,15 @@ import httpx
 from fastapi import HTTPException, Query
 import requests
 import os
+from dotenv import load_dotenv
+
+load_dotenv
 
 HF_API_URL = "https://router.huggingface.co/featherless-ai/v1/completions"
 HEADERS = {"Authorization": f"Bearer {os.getenv('HUGGINGFACE_API_KEY')}"}
 
 async def ai_diagnose(symptoms: str = str, knowledge_chunks = []):
+    print(HEADERS)
     """This is the RAG endpoint using Llama-3.1-8B"""
     
     # 1. Retrieval (Basic keyword match for now)
@@ -42,7 +46,8 @@ async def ai_diagnose(symptoms: str = str, knowledge_chunks = []):
         raise HTTPException(status_code=404, detail="Could not map symptoms to a known disease.")
 
     # 4. Trigger the shared FDA search logic
-    data = await fetch_from_fda(disease_name)
+    disease_name = disease_name.lower()
+    data = await fetch_from_fda(disease_name, "approved")
     
     return {
         "source": "AI-RAG-Diagnosis",
